@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - Claude Code 可视化{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-tachometer-alt me-2"></i>
+            仪表板
+        </h2>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <i class="fas fa-comments fa-2x text-primary mb-2"></i>
+                <h4>{{ summary.total_conversations }}</h4>
+                <p class="card-text">总对话数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <i class="fas fa-folder fa-2x text-success mb-2"></i>
+                <h4>{{ summary.projects|length }}</h4>
+                <p class="card-text">涉及项目</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <i class="fas fa-layer-group fa-2x text-warning mb-2"></i>
+                <h4>{{ summary.sessions }}</h4>
+                <p class="card-text">会话数量</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <i class="fas fa-calendar fa-2x text-info mb-2"></i>
+                <h4>
+                    {% if summary.date_range %}
+                        {{ (summary.date_range.latest[:10]) }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </h4>
+                <p class="card-text">最近活动</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 项目列表 -->
+{% if summary.projects %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-folder-open me-2"></i>
+                    项目列表
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for project in summary.projects[:12] %}
+                    <div class="col-md-6 col-lg-4 mb-2">
+                        <span class="badge project-badge d-block text-start p-2">
+                            <i class="fas fa-folder me-1"></i>
+                            {{ project.split('/')[-1] or project }}
+                            <small class="text-muted d-block">{{ project }}</small>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% if summary.projects|length > 12 %}
+                    <div class="col-12">
+                        <small class="text-muted">还有 {{ summary.projects|length - 12 }} 个项目...</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 最近对话 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>
+                    最近对话
+                </h5>
+                <a href="/conversations" class="btn btn-sm btn-outline-primary">
+                    查看全部
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_conversations %}
+                    {% for conv in recent_conversations %}
+                    <div class="conversation-item p-3 border rounded mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">
+                                    <i class="fas fa-comment-dots me-1"></i>
+                                    {{ conv.display[:100] }}{% if conv.display|length > 100 %}...{% endif %}
+                                </h6>
+                                <div class="conversation-meta mb-2">
+                                    <span class="me-3">
+                                        <i class="fas fa-clock me-1"></i>
+                                        {{ conv.formatted_time }}
+                                    </span>
+                                    <span class="me-3">
+                                        <i class="fas fa-folder me-1"></i>
+                                        {{ conv.project.split('/')[-1] if conv.project else 'Unknown' }}
+                                    </span>
+                                    {% if conv.has_full_content %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-circle me-1"></i>完整对话
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>仅问题
+                                    </span>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 显示对话预览 -->
+                                {% if conv.has_full_content and conv.full_conversation %}
+                                <div class="conversation-preview">
+                                    {% for message in conv.full_conversation[:2] %}  {# 只显示前2条消息 #}
+                                    <div class="message-preview mb-2 p-2 rounded {% if message.type == 'user' %}bg-primary bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                                        <small class="badge {% if message.type == 'user' %}bg-primary{% else %}bg-success{% endif %} me-2">
+                                            {% if message.type == 'user' %}用户{% else %}Claude{% endif %}
+                                        </small>
+                                        <span class="text-muted">
+                                            {{ (message.content[:150] + '...' if message.content|length > 150 else message.content)|replace('\n', ' ')|replace('  ', ' ') }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                    {% if conv.full_conversation|length > 2 %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-ellipsis-h me-1"></i>
+                                        还有 {{ conv.full_conversation|length - 2 }} 条消息
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="ms-3">
+                                <div class="btn-group-vertical">
+                                    <button class="btn btn-sm btn-outline-info mb-1"
+                                            onclick="showConversationDetails('{{ conv.sessionId }}')"
+                                            title="查看详情">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if conv.has_full_content %}
+                                    <button class="btn btn-sm btn-outline-success"
+                                            onclick="copyFullConversation('{{ conv.sessionId }}')"
+                                            title="复制完整对话">
+                                        <i class="fas fa-clipboard"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-comments fa-3x mb-3"></i>
+                        <p>暂无对话记录</p>
+                        <small>开始使用 Claude Code 后，对话记录会显示在这里</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 时间范围信息 -->
+{% if summary.date_range %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>数据时间范围:</strong>
+            {{ summary.date_range.earliest }} 到 {{ summary.date_range.latest }}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyFullConversation(sessionId) {
+    // 通过API获取完整对话内容
+    fetch(`/api/conversation/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.conversation && data.conversation.full_conversation) {
+                let fullText = `对话记录\n项目: ${data.conversation.project}\n时间: ${data.conversation.formatted_time}\n问题: ${data.conversation.display}\n\n`;
+
+                data.conversation.full_conversation.forEach((message, index) => {
+                    const speaker = message.type === 'user' ? '用户' : 'Claude';
+                    const time = message.formatted_time ? ` (${message.formatted_time})` : '';
+                    fullText += `${index + 1}. [${speaker}]${time}:\n${message.content}\n\n`;
+                });
+
+                navigator.clipboard.writeText(fullText).then(function() {
+                    showToast('复制成功', '完整对话已复制到剪贴板', 'success');
+                }).catch(function(err) {
+                    console.error('复制失败: ', err);
+                    showToast('复制失败', '请手动复制', 'error');
+                });
+            } else {
+                showToast('复制失败', '无法获取完整对话内容', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('获取对话详情失败:', err);
+            showToast('复制失败', '无法获取对话详情', 'error');
+        });
+}
+
+function showToast(title, message, type = 'success') {
+    const iconClass = type === 'success' ? 'fa-check-circle text-success' : 'fa-exclamation-circle text-danger';
+
+    const toast = document.createElement('div');
+    toast.className = 'toast position-fixed top-0 end-0 m-3';
+    toast.innerHTML = `
+        <div class="toast-header">
+            <i class="fas ${iconClass} me-2"></i>
+            <strong class="me-auto">${title}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

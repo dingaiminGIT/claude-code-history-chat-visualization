@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}对话历史 - Claude Code 可视化{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-comments me-2"></i>
+            对话历史
+        </h2>
+    </div>
+</div>
+
+<!-- 分页信息 -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                显示第 {{ (pagination.page - 1) * pagination.per_page + 1 }} -
+                {{ pagination.page * pagination.per_page if pagination.page * pagination.per_page < pagination.total else pagination.total }}
+                条，共 {{ pagination.total }} 条对话
+            </div>
+            <div>
+                <a href="/search" class="btn btn-outline-primary">
+                    <i class="fas fa-search me-1"></i>搜索对话
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 对话列表 -->
+<div class="row">
+    <div class="col-12">
+        {% if conversations %}
+            {% for conv in conversations %}
+            <div class="conversation-item border rounded mb-4 shadow-sm">
+                <!-- 对话头部信息 -->
+                <div class="conversation-header p-3 bg-light border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-2 text-primary">
+                                <i class="fas fa-comment-dots me-2"></i>
+                                {{ conv.display }}
+                            </h6>
+                            <div class="conversation-meta">
+                                <span class="me-3">
+                                    <i class="fas fa-clock me-1"></i>
+                                    {{ conv.formatted_time }}
+                                </span>
+                                <span class="me-3">
+                                    <i class="fas fa-folder me-1"></i>
+                                    <span class="badge bg-secondary">
+                                        {{ conv.project.split('/')[-1] if conv.project else 'Unknown' }}
+                                    </span>
+                                </span>
+                                {% if conv.sessionId %}
+                                <span class="me-3">
+                                    <i class="fas fa-fingerprint me-1"></i>
+                                    <small class="text-muted">{{ conv.sessionId[:8] }}...</small>
+                                </span>
+                                {% endif %}
+                                {% if conv.has_full_content %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check-circle me-1"></i>完整对话
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>仅问题
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group">
+                                {% if conv.sessionId %}
+                                <button class="btn btn-sm btn-outline-info"
+                                        onclick="showConversationDetails('{{ conv.sessionId }}')"
+                                        title="查看详情">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        onclick="copyToClipboard('{{ conv.display }}')"
+                                        title="复制问题">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                {% if conv.has_full_content %}
+                                <button class="btn btn-sm btn-outline-success"
+                                        onclick="copyFullConversation('{{ conv.sessionId }}')"
+                                        title="复制完整对话">
+                                    <i class="fas fa-clipboard"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 完整对话内容 -->
+                {% if conv.has_full_content and conv.full_conversation %}
+                <div class="conversation-content">
+                    {% for message in conv.full_conversation[:6] %}  {# 只显示前6条消息 #}
+                    <div class="message p-3 {% if message.type == 'user' %}bg-primary bg-opacity-10 border-start border-primary border-3{% else %}bg-success bg-opacity-10 border-start border-success border-3{% endif %}">
+                        <div class="message-header mb-2">
+                            <span class="badge {% if message.type == 'user' %}bg-primary{% else %}bg-success{% endif %}">
+                                {% if message.type == 'user' %}
+                                    <i class="fas fa-user me-1"></i>用户
+                                {% else %}
+                                    <i class="fas fa-robot me-1"></i>Claude
+                                {% endif %}
+                            </span>
+                            {% if message.formatted_time %}
+                            <small class="text-muted ms-2">{{ message.formatted_time }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="message-content">
+                            {% set content_preview = message.content[:300] + '...' if message.content|length > 300 else message.content %}
+                            <div class="formatted-content mb-0">{{ content_preview|replace('\n', '<br>')|safe }}</div>
+                            {% if message.content|length > 300 %}
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        onclick="toggleMessageContent(this, '{{ message.uuid }}')"
+                                        data-full-content="{{ message.content|e }}">
+                                    <i class="fas fa-expand-alt me-1"></i>展开完整内容
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if conv.full_conversation|length > 6 %}
+                    <div class="text-center p-3 bg-light">
+                        <button class="btn btn-outline-primary"
+                                onclick="showConversationDetails('{{ conv.sessionId }}')"
+                                title="查看完整对话">
+                            <i class="fas fa-ellipsis-h me-1"></i>
+                            还有 {{ conv.full_conversation|length - 6 }} 条消息，点击查看完整对话
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <!-- 如果没有完整对话，显示原始格式 -->
+                <div class="p-3">
+                    <div class="alert alert-warning mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        此对话记录仅包含问题内容，完整对话内容可能未找到或已丢失。
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 项目完整路径 -->
+                {% if conv.project %}
+                <div class="conversation-footer p-2 bg-light border-top">
+                    <small class="text-muted">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        项目路径: {{ conv.project }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-comments fa-4x mb-3"></i>
+                <h4>暂无对话记录</h4>
+                <p>开始使用 Claude Code 后，对话记录会显示在这里</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 分页导航 -->
+{% if pagination.pages > 1 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <nav aria-label="对话分页">
+            <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ pagination.page - 1 }}">
+                        <i class="fas fa-chevron-left"></i> 上一页
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for page_num in range(1, pagination.pages + 1) %}
+                    {% if page_num == pagination.page %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% elif page_num <= 3 or page_num > pagination.pages - 3 or (page_num >= pagination.page - 2 and page_num <= pagination.page + 2) %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                    {% elif page_num == 4 or page_num == pagination.pages - 3 %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ pagination.page + 1 }}">
+                        下一页 <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToClipboard(text, message = '内容已复制到剪贴板') {
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('复制成功', message, 'success');
+    }).catch(function(err) {
+        console.error('复制失败: ', err);
+        showToast('复制失败', '请手动复制', 'error');
+    });
+}
+
+function copyFullConversation(sessionId) {
+    // 通过API获取完整对话内容
+    fetch(`/api/conversation/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.conversation && data.conversation.full_conversation) {
+                let fullText = `对话记录\n项目: ${data.conversation.project}\n时间: ${data.conversation.formatted_time}\n问题: ${data.conversation.display}\n\n`;
+
+                data.conversation.full_conversation.forEach((message, index) => {
+                    const speaker = message.type === 'user' ? '用户' : 'Claude';
+                    const time = message.formatted_time ? ` (${message.formatted_time})` : '';
+                    fullText += `${index + 1}. [${speaker}]${time}:\n${message.content}\n\n`;
+                });
+
+                copyToClipboard(fullText, '完整对话已复制到剪贴板');
+            } else {
+                showToast('复制失败', '无法获取完整对话内容', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('获取对话详情失败:', err);
+            showToast('复制失败', '无法获取对话详情', 'error');
+        });
+}
+
+function toggleMessageContent(button, messageId) {
+    const contentDiv = button.closest('.message-content').querySelector('.formatted-content');
+    const fullContent = button.getAttribute('data-full-content');
+
+    if (button.classList.contains('expanded')) {
+        // 收起
+        const preview = fullContent.length > 300 ? fullContent.substring(0, 300) + '...' : fullContent;
+        contentDiv.innerHTML = preview.replace(/\n/g, '<br>');
+        button.innerHTML = '<i class="fas fa-expand-alt me-1"></i>展开完整内容';
+        button.classList.remove('expanded');
+    } else {
+        // 展开
+        contentDiv.innerHTML = fullContent.replace(/\n/g, '<br>');
+        button.innerHTML = '<i class="fas fa-compress-alt me-1"></i>收起内容';
+        button.classList.add('expanded');
+    }
+}
+
+function showToast(title, message, type = 'success') {
+    const iconClass = type === 'success' ? 'fa-check-circle text-success' : 'fa-exclamation-circle text-danger';
+
+    const toast = document.createElement('div');
+    toast.className = 'toast position-fixed top-0 end-0 m-3';
+    toast.innerHTML = `
+        <div class="toast-header">
+            <i class="fas ${iconClass} me-2"></i>
+            <strong class="me-auto">${title}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

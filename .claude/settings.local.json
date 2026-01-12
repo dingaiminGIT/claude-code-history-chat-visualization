@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(python claude_parser.py:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(./setup.sh)",
+      "Bash(./run.sh)",
+      "Bash(pkill:*)",
+      "Bash(tree:*)",
+      "Bash(source:*)",
+      "Bash(python app.py:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
